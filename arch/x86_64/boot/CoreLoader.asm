@@ -24,7 +24,14 @@ section code vstart=CoreLoaderAddress
 
 	Enter32ModeMessage db "Now, we are running in the 32 bits protected mode!", 0x0a, 0x0d, 0x00
 	NoIA32Message db "The computer haven't ia-32a mode, so you can run the version in the computer!", 0x0a, 0x0d, 0x00
-	AddressSizeMessage db "Physical address size %d", 0x0a, 0x0d, "Linear address size %d", 0x0a, 0x0d, 0x00
+	AddressSizeMessage db "Physical address size %d", 0x0a, 0x0d, "Linear address size %d.", 0x0a, 0x0d, 0x00
+	Enter64ModeMessage db "Now, we are running in the 64 bits protected mode!", 0x0a, 0x0d, 0x00
+	NoFatFileSystemMessage db "In the disk, we haven't finded any FAT fils System, so there isn't core in the disk.", 0x0a, 0x0d, 0x00
+	NotEffectiveMessage db "The FAT file system is not effective!", 0x0a, 0x0d, 0x00
+	NoFinedMessage db "There isn't a core file in the FAT file system", 0x0a, 0x0d, 0x00
+	CorePath db "CORE"
+			 times (12 - ($ - CorePath)) db 0x20
+			 db 0x00
 
 bits 32
 NumberToString:
@@ -323,6 +330,10 @@ load32:
 		loop .clean3
 	mov dword [ebx + 0 * 8], 0x83
 
+	call LoadCore
+
+	push eax
+
 	mov eax, PML4PhysicalAddress
 	mov cr3, eax
 
@@ -336,16 +347,17 @@ load32:
 	bts eax, 8
 	wrmsr
 
-	dec esp
-	mov byte [esp], "b"
-	call putc
-	inc esp
-
 	mov eax, cr0
 	or eax, 0x80000000
 	mov cr0, eax
 
-	jmp 0x0018:load64
+	hlt
+
+	pop eax
+	push word 0x0018
+	push dword 0
+	push eax
+	retf
 
 .end:
 	hlt
@@ -356,6 +368,270 @@ load32:
 	call puts
 	add esp, 4
 	jmp .end
+
+CheckString:
+	push ebp
+	mov ebp, esp
+	push ecx
+
+	mov edi, [ebp + 8]
+	mov esi, [ebp + 12]
+	mov ecx, [ebp + 16]
+
+	.check:
+		mov al, [esi]
+		cmp [edi], al
+		jnz .NotSame
+		inc esi
+		inc edi
+		loop .check
+
+	.Same:
+		mov eax, -1
+		jmp .end
+
+	.NotSame:
+		mov eax, 0
+
+.end:
+	pop ecx
+	pop ebp
+	ret
+
+ReadDisk:
+	push ebp
+	mov ebp, esp
+
+	mov dx, 0x1f2
+	mov eax, [ebp + 16]
+	out dx, al
+
+	mov eax, [ebp + 8]
+	inc dx
+	out dx, al
+
+	inc dx
+	shr eax, 8
+	out dx, al
+
+	inc dx
+	shr eax, 8
+	out dx, al
+
+	inc dx
+	shr eax, 8
+	or al, 0xe0
+	out dx, al
+
+	inc dx
+	mov al, 0x20
+	out dx, al
+
+	.wait:
+		in al, dx
+		and al, 0x89
+		cmp al, 0x01
+		jz .error
+		cmp al, 0x08
+		jnz .wait
+
+	mov ebx, [ebp + 12]
+	mov ax, [ebp + 16]
+	mov cx, 512
+	mul cx
+	mov cx, dx
+	shl ecx, 16
+	mov cx, ax
+	mov dx, 0x1f0
+	.read:
+		in ax, dx
+		mov [ebx], ax
+		add ebx, 2
+		loop .read
+		jmp .end
+
+	.error:
+		hlt
+
+.end:
+	pop ebp
+	ret
+
+OpenFile:
+	push ebp
+	mov ebp, esp
+	sub esp, 20; ebp - 4为fat文件系统在mbr的描述; ebp - 8为core根目录的结构体; ebp - 12为数据区的LBA号; ebp - 16为一个簇的大小，单位为扇区; ebp - 20为文件的LBA号
+
+	; 寻找Fat分区
+	mov ebx, 0x7c00 + 446
+	mov edi, 0
+	mov ecx, 4
+	.check:
+		mov al, [ebx + edi + 0]
+		cmp al, 0x80
+		jnz .next
+		mov al, [ebx + edi + 4]
+		cmp al, 0x01
+		jz .isFat32
+		cmp al, 0x04
+		jz .isFat16
+		cmp al, 0x06
+		jz .isFat16
+	.next:
+		add edi, 16
+		loop .check
+
+	jmp .NoFatFileSystem
+
+	.isFat32:
+
+	.isFat16:
+		lea ebx, [ebx + edi]
+		mov [ebp - 4], ebx
+		push dword 1
+		push dword [ebp + 12]
+		push dword [ebx + 8]
+		call ReadDisk
+		add esp, 12
+
+		mov ebx, [ebp + 12]
+		cmp word [ebx + 510], 0xaa55
+		jnz .NotEffective
+
+		mov al, [ebx + 0x0d]
+		mov [ebp - 16], al
+
+		mov eax, [ebx + 0x1c]
+		mov [ebp - 12], eax
+		
+		xor eax, eax
+		mov ax, [ebx + 0x0e]
+		add [ebp - 12], eax
+
+		mov ebx, [ebp + 12]
+		mov ax, [ebx + 0x16]
+		xor ecx, ecx
+		mov cl, [ebx + 0x10]
+		mul cx
+		shl edx, 16
+		mov dx, ax
+
+		add [ebp - 12], edx
+
+		xor eax, eax
+		mov ax, [ebx + 0x11]
+		xor edx, edx
+		xor cx, cx
+		mov cl, 32
+		mul cx
+		mov cx, 512
+		div cx
+		or dx, dx
+		jz .@1
+		inc eax
+	.@1:
+		mov edx, eax
+
+		push edx
+		push dword [ebp + 12]
+		push dword [ebp - 12]
+		call ReadDisk
+		add esp, 8
+		pop edx
+		add [ebp - 12], edx
+
+		mov ecx, 512
+		mov ebx, [ebp + 12]
+		mov edi, 0
+		.find:
+			lea eax, [ebx + edi + 0]
+			push edi; 保护edi寄存器
+			push dword 12
+			push eax
+			push dword CorePath
+			call CheckString
+			add esp, 12
+			pop edi
+			or eax, eax
+			jnz .finded
+			add edi, 32
+			loop .find
+		
+		jmp .NoFined
+
+		.finded:
+			lea ebx, [ebx + edi]
+			mov [ebp -8], ebx
+			xor eax, eax
+			mov ax, [ebx + 0x1a]
+			sub ax, 2
+			xor ecx, ecx
+			mov cl, [ebp - 16]
+			mul cx
+			shl edx, 16
+			mov dx, ax
+			add edx, [ebp - 12]
+			mov [ebp - 20], edx
+
+			mov eax, [ebx + 0x1c]
+			push ax
+			shr eax, 16
+			mov dx, ax
+			pop ax
+			mov cx, 512
+			div cx
+			or dx, dx
+			jz .read
+			inc eax
+		.read:
+			push eax
+			push dword [ebp + 12]
+			push dword [ebp - 20]
+			call ReadDisk
+			add esp, 12
+			mov eax, -1
+			jmp .end
+	
+	.NoFined:
+		push dword NoFinedMessage
+		call puts
+		add esp, 4
+		mov eax, 0
+		jmp .end
+	
+	.NotEffective:
+		push dword NotEffectiveMessage
+		call puts
+		add esp, 4
+		mov eax, 0
+		jmp .end
+
+	.NoFatFileSystem:
+		push dword NoFatFileSystemMessage
+		call puts
+		add esp, 4
+		mov eax, 0
+
+	.end:
+		add esp, 20
+		pop ebp
+		ret
+
+LoadCore:
+	push ebp
+	mov ebp, esp
+	sub esp, 4
+
+	push dword CoreCache
+	push dword CorePath
+	call OpenFile
+	add esp, 8
+
+	hlt
+
+	add esp, 4
+	pop ebp
+	ret
 
 putc:
 	push ebp
@@ -437,11 +713,6 @@ putc:
 	pop ebp
 	ret
 
-bits 64
-load64:
-	mov qword [0xb8000], 0x20
-.end:
-	hlt
-	jmp .end
 section trail
 	end:
+		dd OpenFile.finded

@@ -41,5 +41,4 @@ int 0x13
 	jmp .stop
 
 message0 db "Disk error"
-times 510 - ($ - $$) db 0
-db 0x55, 0xaa
+times 424 - ($ - $$) db 0

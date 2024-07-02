@@ -1,5 +1,6 @@
 %define CoreLoaderAddress 0x8e00
 %define CoreDataAddress 0x7e00
+%define CoreCache 0x20000
 %define GdtAddress 0x9e00
 %define PML4PhysicalAddress 0x12000
 %define PDPTPhysicalAddress 0x13000
@@ -15,8 +16,11 @@ mov es, ax
 mov ss, ax
 mov sp, 0x7c00
 
+mov eax, [0x7c00 + 446 + 8]
+
 push dword 0
-push dword 1
+push dword eax
+mov ax, cs
 push ax
 push word CoreLoaderAddress
 push word 1
