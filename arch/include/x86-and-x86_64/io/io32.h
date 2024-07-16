@@ -3,21 +3,30 @@
 
 #include "btype.h"
 
-inline UINT8 io_in8(UINT16 port)
+static inline UINT8 io_in8(UINT16 port)
 {
-    UINT8 data
-    asm(
-        "push edx\n\t"
-        "push eax\n\t"
-        "mov dx, %1\n\t"
-        "in al, dx\n\t"
-        "mov %0, al\n\t"
-        "pop eax\n\t"
-        "pop edx\n\t"
-        :
-        :
-    );
+	UINT8 data;
+	asm(
+		"mov dx, %1\n\t"
+		"in al, dx\n\t"
+		"mov %0, al\n\t"
+		:"=m"(data)
+		:"m"(port)
+		:"eax", "edx"
+	);
+	return data;
 }
-inline void io_out8(UINT16 port, UINT8);
+
+static inline void io_out8(UINT16 port, UINT8 data)
+{
+	asm(
+		"mov dx, %1\n\t"
+		"mov al, %0\n\t"
+		"out dx, al\n\t"
+		:
+		:"m"(data), "m"(port)
+		:"eax", "edx"
+	);
+}
 
 #endif

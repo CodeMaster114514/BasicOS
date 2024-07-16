@@ -8,7 +8,7 @@ section code vstart=CoreLoaderAddress
 	GDTR_L  dw 0
 	GDTR_in dd 0
 
-	CoreDataAddressNextCanBeUsed dd CoreDataAddress
+	CoreDataAddressNextCanBeUsed dq CoreDataAddress
 
 	ARD_count dd 0
 
@@ -19,17 +19,22 @@ section code vstart=CoreLoaderAddress
 	NumberStringCache1 times 11 db 0x00
 	NumberStringCache2 times 11 db 0x00
 
+	CPUDINFO2 dd 0; 底字节为edx
+	CPUDINFO1 dd 0
+
 	PhysicalAddressSize dd 0
 	LinearAddressSize dd 0
 
 	Enter32ModeMessage db "Now, we are running in the 32 bits protected mode!", 0x0a, 0x0d, 0x00
-	NoIA32Message db "The computer haven't ia-32a mode, so you can run the version in the computer!", 0x0a, 0x0d, 0x00
+	NoIA32Message db "The computer haven't ia-32e mode, so you can run the version in the computer!", 0x0a, 0x0d, 0x00
 	AddressSizeMessage db "Physical address size %d", 0x0a, 0x0d, "Linear address size %d.", 0x0a, 0x0d, 0x00
 	Enter64ModeMessage db "Now, we are running in the 64 bits protected mode!", 0x0a, 0x0d, 0x00
 	NoFatFileSystemMessage db "In the disk, we haven't finded any FAT fils System, so there isn't core in the disk.", 0x0a, 0x0d, 0x00
 	NotEffectiveMessage db "The FAT file system is not effective!", 0x0a, 0x0d, 0x00
 	NoFinedMessage db "There isn't a core file in the FAT file system", 0x0a, 0x0d, 0x00
-	CorePath db "CORE"
+	ReadSuccess db "Success", 0x0a, 0x0d, 0x00
+	ReadError db "We have some error in read disk and the error code is %d", 0x0a, 0x0d, 0x00
+	CorePath db "KERNEL"
 			 times (12 - ($ - CorePath)) db 0x20
 			 db 0x00
 
@@ -159,7 +164,7 @@ start:
 	mov di, 0
 	.getARD:
 		mov ecx, 24
-		mov edx, "SMAP"
+		mov edx, "sddj"
 		mov eax, 0xe820
 		int 0x15
 		jc .e801h
@@ -280,7 +285,12 @@ load32:
 	push edi
 	call puts
 	add esp, 4
-	
+
+	mov eax, 2
+	cpuid
+	mov [CPUDINFO1], ebx
+	mov [CPUDINFO2], edx
+
 	dec esp
 	mov byte [esp], 0x0a
 	call putc
@@ -298,6 +308,12 @@ load32:
 	push dword AddressSizeMessage
 	call puts
 	add esp, 12
+
+	call LoadCoreFile
+
+	push dword ReadSuccess
+	call puts
+	add esp, 4
 
 	; 准备进入ia-32e模式
 
@@ -329,9 +345,7 @@ load32:
 		add esi, 4
 		loop .clean3
 	mov dword [ebx + 0 * 8], 0x83
-
-	call LoadCore
-
+	mov dword [ebx + 1 * 8], CoreCache | 0x83
 	push eax
 
 	mov eax, PML4PhysicalAddress
@@ -351,13 +365,7 @@ load32:
 	or eax, 0x80000000
 	mov cr0, eax
 
-	hlt
-
-	pop eax
-	push word 0x0018
-	push dword 0
-	push eax
-	retf
+	jmp 0x0018:load64
 
 .end:
 	hlt
@@ -451,6 +459,13 @@ ReadDisk:
 		jmp .end
 
 	.error:
+		mov dx, 0x1f1
+		xor eax, eax
+		in al, dx
+		push eax
+		push dword ReadError
+		call puts
+		add esp, 8
 		hlt
 
 .end:
@@ -460,7 +475,8 @@ ReadDisk:
 OpenFile:
 	push ebp
 	mov ebp, esp
-	sub esp, 20; ebp - 4为fat文件系统在mbr的描述; ebp - 8为core根目录的结构体; ebp - 12为数据区的LBA号; ebp - 16为一个簇的大小，单位为扇区; ebp - 20为文件的LBA号
+	sub esp, 28; ebp - 4为fat文件系统在mbr的描述; ebp - 8为目标文件在根目录的结构体; ebp - 12为数据区的LBA号; ebp - 16为一个簇的大小，单位为扇区; ebp - 20为文件的下一个簇号
+			   ; ebp -24为FAT表在内存的地址; ebp - 28为根目录在内存的地址
 
 	; 寻找Fat分区
 	mov ebx, 0x7c00 + 446
@@ -489,17 +505,18 @@ OpenFile:
 		lea ebx, [ebx + edi]
 		mov [ebp - 4], ebx
 		push dword 1
-		push dword [ebp + 12]
+		push dword FileSystemCache
 		push dword [ebx + 8]
 		call ReadDisk
 		add esp, 12
 
-		mov ebx, [ebp + 12]
+		mov ebx, FileSystemCache
 		cmp word [ebx + 510], 0xaa55
 		jnz .NotEffective
 
+		xor eax, eax
 		mov al, [ebx + 0x0d]
-		mov [ebp - 16], al
+		mov [ebp - 16], eax
 
 		mov eax, [ebx + 0x1c]
 		mov [ebp - 12], eax
@@ -508,7 +525,25 @@ OpenFile:
 		mov ax, [ebx + 0x0e]
 		add [ebp - 12], eax
 
-		mov ebx, [ebp + 12]
+		push word 0
+		push word [ebx + 0x0e]
+		push dword FileSystemCache + 0x200
+		push dword [ebp - 12]
+		call ReadDisk
+		add esp, 12
+		mov dword [ebp - 24], FileSystemCache + 0x200
+
+		mov dword [ebp - 28], FileSystemCache + 0x200
+		mov ebx, FileSystemCache
+		mov ax, [ebx + 0x16]
+		mov dx, 0
+		mov cx, 512
+		mul cx
+		shl edx, 16
+		mov dx, ax
+		add [ebp - 28], edx
+
+		mov ebx, FileSystemCache
 		mov ax, [ebx + 0x16]
 		xor ecx, ecx
 		mov cl, [ebx + 0x10]
@@ -533,7 +568,7 @@ OpenFile:
 		mov edx, eax
 
 		push edx
-		push dword [ebp + 12]
+		push dword [ebp - 28]
 		push dword [ebp - 12]
 		call ReadDisk
 		add esp, 8
@@ -541,14 +576,14 @@ OpenFile:
 		add [ebp - 12], edx
 
 		mov ecx, 512
-		mov ebx, [ebp + 12]
+		mov ebx, [ebp - 28]
 		mov edi, 0
 		.find:
 			lea eax, [ebx + edi + 0]
 			push edi; 保护edi寄存器
 			push dword 12
 			push eax
-			push dword CorePath
+			push dword [ebp + 8]
 			call CheckString
 			add esp, 12
 			pop edi
@@ -561,34 +596,55 @@ OpenFile:
 
 		.finded:
 			lea ebx, [ebx + edi]
-			mov [ebp -8], ebx
 			xor eax, eax
 			mov ax, [ebx + 0x1a]
-			sub ax, 2
-			xor ecx, ecx
-			mov cl, [ebp - 16]
-			mul cx
-			shl edx, 16
-			mov dx, ax
-			add edx, [ebp - 12]
-			mov [ebp - 20], edx
+			mov [ebp - 20], eax
 
-			mov eax, [ebx + 0x1c]
-			push ax
-			shr eax, 16
-			mov dx, ax
-			pop ax
+			xor eax, eax
+			xor ecx, ecx
+			mov al, [ebp - 16]
 			mov cx, 512
+			mul cx
+			push ax
+			mov ax, [ebx + 0x1c]
+			mov dx, [ebx + 0x1c + 2]
+			pop cx
 			div cx
 			or dx, dx
-			jz .read
+			jz .@2
 			inc eax
-		.read:
-			push eax
-			push dword [ebp + 12]
-			push dword [ebp - 20]
-			call ReadDisk
-			add esp, 12
+		.@2:
+			xor edx, edx
+			mov dx, cx
+			mov ecx, eax
+			.read:
+				push ecx
+				push edx
+				push dword [ebp - 16]
+				mov ebx, [ebp - 8]
+				xor eax, eax
+				mov ax, [ebp - 20]
+				sub ax, 2
+				xor ecx, ecx
+				mov cl, [ebp - 16]
+				mul cx
+				shl edx, 16
+				mov dx, ax
+				add edx, [ebp - 12]
+				push dword [ebp + 12]
+				push edx
+				call ReadDisk
+				add esp, 12
+				mov ebx, [ebp - 24]
+				xor ecx, ecx
+				mov cx, [ebp - 20]
+				xor eax, eax
+				mov ax, [ebx + ecx * 2]
+				mov [ebp - 20], ax
+				pop edx
+				add [ebp + 12], edx
+				pop ecx
+				loop .read
 			mov eax, -1
 			jmp .end
 	
@@ -613,11 +669,11 @@ OpenFile:
 		mov eax, 0
 
 	.end:
-		add esp, 20
+		add esp, 28
 		pop ebp
 		ret
 
-LoadCore:
+LoadCoreFile:
 	push ebp
 	mov ebp, esp
 	sub esp, 4
@@ -626,9 +682,11 @@ LoadCore:
 	push dword CorePath
 	call OpenFile
 	add esp, 8
+	
+	or eax, eax
+	jz .end
 
-	hlt
-
+.end:
 	add esp, 4
 	pop ebp
 	ret
@@ -713,6 +771,186 @@ putc:
 	pop ebp
 	ret
 
+bits 64
+
+load64:
+	mov rsp, 0x7c00
+	push qword CoreCache
+	call LoadElf
+	mov rdi, rax
+	mov rsi, [CoreDataAddressNextCanBeUsed]
+	add qword [CoreDataAddressNextCanBeUsed], 1024
+	mov rbx, rsi
+	mov rax, [CoreDataAddressNextCanBeUsed]
+	mov [rbx + 0x00], rax
+	mov dl, [is_e801]
+	mov rcx, [memory_size]
+	mov r8, [CPUDINFO2]
+	call gotoKernel
+	add rsp, 4
+	.end:
+		hlt
+		jmp end
+
+isElf:
+	push rbp
+	mov rbp, rsp
+
+	mov rbx, [rbp + 16]
+	cmp dword [rbx], 0x464c457f
+	jnz .NotElfFile
+	mov eax, -1
+	jmp .end
+
+	.NotElfFile:
+		mov eax, 0
+
+.end:
+	pop rbp
+	ret
+
+MapPage:
+	push rbp
+	mov rbp, rsp
+
+	mov rax, [rbp + 16]
+	mov rdx, 0xffff800000000000
+	and rax, rdx
+	jz .end
+
+	mov rax, [rbp + 16]
+	shr rax, 21
+	and rax, 0x1ff
+	mov rbx, PDPhysicalAddress
+	mov rdx, [rbx + rax * 8]
+	and rdx, 0x1
+	jnz .startMap
+
+	mov qword [rbx + rax * 8], PTPhysicalAddress | 0x3
+
+	.startMap:
+		mov rbx, PTPhysicalAddress
+		mov rax, [rbp + 16]
+		shr rax, 12
+		and rax, 0x1ff
+		mov rdx, [rbp + 24]
+		or rdx, [rbp + 32]
+		mov [rbx + rax * 8], rdx
+		mov rax, cr3
+		mov cr3, rax
+
+.end:
+	pop rbp
+	ret
+
+LoadSeg:
+	push rbp
+	mov rbp, rsp
+	sub rsp, 32; rbp - 8为文件的起始地址; rbp - 16为一个程序节的大小; rbp - 24为程序节的个数; rbp - 32为程序节的起始地址
+
+	mov rax, [rbp + 28]
+	mov [rbp - 8], rax
+	xor rax, rax
+	mov ax, [rbp + 26]
+	mov [rbp - 16], rax
+	mov ax, [rbp + 24]
+	mov [rbp - 24], rax
+	mov eax, [rbp + 16]
+	mov [ebp - 32], rax
+
+	xor rsi, rsi
+	mov rcx, [rbp - 24]
+	.load:
+		mov [rbp - 24], rcx
+		mov rbx, [rbp - 32]
+		cmp dword [rbx + rsi], 0x00000001
+		jnz .continue
+		mov eax, [rbx + rsi + 0x04]
+		bt eax, 2
+		jc .CanWrite
+		mov rdx, 0x1
+	.CanWrite:
+		mov rdx, 0x3
+		bt eax, 1
+		jnc .CantExectionable
+		bts rdx, 64
+	.CantExectionable:
+		mov rdi, rdx
+		mov rax, [rbx + rsi + 0x20]
+		push rax
+		shr rax, 32
+		mov edx, eax
+		pop rax
+		mov rcx, 0x1000
+		div ecx
+		or edx, edx
+		jz .@1
+		inc eax
+	.@1:
+		xor rcx, rcx
+		mov ecx, eax
+		.mapping:
+			push rcx
+			push rdi
+			mov rax, [rbx + rsi + 0x08]
+			add rax, [rbp - 8]
+			push rax
+			push qword [rbx + rsi + 0x10]
+			call MapPage
+			add rsp, 24
+			add rsi, [rbp - 16]
+			pop rcx
+			loop .mapping
+	.continue:
+		mov rcx, [rbp - 24]
+		loop .load
+
+	add rsp, 32
+	pop rbp
+	ret
+
+LoadElf:
+	push rbp
+	mov rbp, rsp
+
+	push qword [rbp + 16]
+	call isElf
+	add rsp, 8
+
+	or rax, rax
+	jz .isNotAElfFile
+
+	mov rbx, [rbp + 16]
+	cmp word [rbx + 0x10], 0x0002
+	jnz .isNotExectionable
+
+	cmp word [rbx + 0x12], 0x003e
+	jnz .isNotX86_64archFile
+
+	push rbx
+	push word [rbx + 0x36]
+	push word [rbx + 0x38]
+	add rbx, [rbx + 0x20]
+	push rbx
+	call LoadSeg
+	add rsp, 12
+	pop rbx
+
+	mov rax, [rbx + 0x18]
+	jmp .end
+	
+	.isNotAElfFile:
+	.isNotExectionable:
+	.isNotX86_64archFile:
+		hlt
+		jmp .isNotAElfFile
+
+.end:
+	pop rbp
+	ret
+
+%include "CoreLoaderInC.asm"
+
 section trail
 	end:
-		dd OpenFile.finded
+		dd load64
