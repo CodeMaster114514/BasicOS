@@ -13,7 +13,7 @@ UINT16 getCursor()
 void setCursor(UINT16 cursor)
 {
 	io_out8(0x3d4, 0x0f);
-	io_out8(0x3d5, cursor & 0x0f);
+	io_out8(0x3d5, cursor & 0x00ff);
 	io_out8(0x3d4, 0x0e);
 	io_out8(0x3d5, cursor >> 8);
 }

@@ -10,4 +10,6 @@ struct
 
 void InitMemory(MMAP *mmap, UINT64 count)
 {
+	MemoryConfigure.mmap = mmap;
+	MemoryConfigure.MmapCount = count;
 }

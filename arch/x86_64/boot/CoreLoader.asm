@@ -32,7 +32,6 @@ section code vstart=CoreLoaderAddress
 	NoFatFileSystemMessage db "In the disk, we haven't finded any FAT fils System, so there isn't core in the disk.", 0x0a, 0x0d, 0x00
 	NotEffectiveMessage db "The FAT file system is not effective!", 0x0a, 0x0d, 0x00
 	NoFinedMessage db "There isn't a core file in the FAT file system", 0x0a, 0x0d, 0x00
-	ReadSuccess db "Success", 0x0a, 0x0d, 0x00
 	ReadError db "We have some error in read disk and the error code is %d", 0x0a, 0x0d, 0x00
 	CorePath db "KERNEL"
 			 times (12 - ($ - CorePath)) db 0x20
@@ -164,7 +163,7 @@ start:
 	mov di, 0
 	.getARD:
 		mov ecx, 24
-		mov edx, "sddj"
+		mov edx, "PAMa"
 		mov eax, 0xe820
 		int 0x15
 		jc .e801h
@@ -286,7 +285,7 @@ load32:
 	call puts
 	add esp, 4
 
-	mov eax, 2
+	mov eax, 1
 	cpuid
 	mov [CPUDINFO1], ebx
 	mov [CPUDINFO2], edx
@@ -310,10 +309,6 @@ load32:
 	add esp, 12
 
 	call LoadCoreFile
-
-	push dword ReadSuccess
-	call puts
-	add esp, 4
 
 	; 准备进入ia-32e模式
 
@@ -409,9 +404,30 @@ CheckString:
 ReadDisk:
 	push ebp
 	mov ebp, esp
+	sub esp, 4
 
+	mov ecx, [ebp + 16]
+	.readSectors:
+		mov [ebp - 4], ecx
+		push dword [ebp + 12]
+		push dword [ebp + 8]
+		call ReadASector
+		add esp, 8
+		add dword [ebp + 12], 512
+		inc dword [ebp + 8]
+		mov ecx, [ebp - 4]
+		loop .readSectors
+
+	leave
+	ret
+
+ReadASector:
+	push ebp
+	mov ebp, esp
+
+.retry:
 	mov dx, 0x1f2
-	mov eax, [ebp + 16]
+	mov al, 1
 	out dx, al
 
 	mov eax, [ebp + 8]
@@ -444,12 +460,7 @@ ReadDisk:
 		jnz .wait
 
 	mov ebx, [ebp + 12]
-	mov ax, [ebp + 16]
-	mov cx, 512
-	mul cx
-	mov cx, dx
-	shl ecx, 16
-	mov cx, ax
+	mov ecx, 256
 	mov dx, 0x1f0
 	.read:
 		in ax, dx
@@ -740,13 +751,14 @@ putc:
 
 	.roll:
 		cmp ebx, 2000
-		jnz .set
+		jl .set
 		mov ax, 0x0010
 		mov es, ax
 		mov edi, 0xb800
 		mov esi, 0xb814
 		
 		mov ecx, 1920
+		cld
 		rep movsw
 		
 		mov ebx, 1920
@@ -777,6 +789,7 @@ load64:
 	mov rsp, 0x7c00
 	push qword CoreCache
 	call LoadElf
+	add rsp, 8
 	mov rdi, rax
 	mov rsi, [CoreDataAddressNextCanBeUsed]
 	add qword [CoreDataAddressNextCanBeUsed], 1024

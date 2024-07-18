@@ -22,6 +22,7 @@ const char *NumToString(long long num)
 		num /= 10;
 		string_index++;
 	}
+	--string_index;
 	int i = 0;
 	while(string_index >= 0)
 	{

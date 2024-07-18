@@ -16,10 +16,10 @@ int kernel(Table *table)
 {
 	InitVideo(&table->gconfigre);
 #if X86_64
+	puts("CPU info %d.\n", table->cpuExInfo);
 	EnableSSE(table->cpuExInfo);
 #endif
 	InitMemory(table->mmap, table->map_count);
-	putc('a', 0xffff);
 	puts("We are running in the ia32e mode\n");
 	puts("The number is %d\n", 512);
 	for(;;)
