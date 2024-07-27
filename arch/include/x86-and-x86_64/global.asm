@@ -2,7 +2,7 @@
 %define CoreDataAddress 0x7e00
 %define CoreCache 0x200000
 %define FileSystemCache 0x30000
-%define GdtAddress 0x9e00
+%define GdtAddress 0xce00
 %define PML4PhysicalAddress 0x12000
 %define PDPTPhysicalAddress 0x13000
 %define PDPhysicalAddress 0x14000

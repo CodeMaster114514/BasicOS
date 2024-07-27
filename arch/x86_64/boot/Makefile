@@ -11,5 +11,5 @@ $(OUT_DIR)/CoreLoader.bin: CoreLoader.asm CoreLoaderInC.asm
 	nasm $(NASM_FLAGS) CoreLoader.asm -o $(OUT_DIR)/CoreLoader.bin
 
 CoreLoaderInC.asm: CoreLoaderInC.c
-	$(CC) $(CC_FLAGS) CoreLoaderInC.c
+	$(CC) $(CC_FLAGS) CoreLoaderInC.c -mno-sse2
 	objconv -fnasm CoreLoaderInC.o CoreLoaderInC.asm

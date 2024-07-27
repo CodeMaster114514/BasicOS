@@ -10,15 +10,21 @@ typedef unsigned long long UINT64;
 
 typedef unsigned char bool;
 
+#define true 1
+#define false 0
+
 enum
 {
-    MAP_FREE_MEMORY,
+    MAP_TYPE_FREE_MEMORY,
     MAP_TYPE_OSCODE,
     MAP_TYPE_OSDATA,
     MAP_TYPE_APIC,
     MAP_TYPE_ACPI,
+    MAP_TYPE_OEM,
     MAP_TYPE_USER_CODE,
-    MAP_TYPE_USER_DATA
+    MAP_TYPE_USER_DATA,
+    MAP_TYPE_HARDWARE,
+    MAP_TYPE_UNKNOW
 };
 
 enum
@@ -28,14 +34,18 @@ enum
     MAP_FLAG_EXECTION = 0b00000100
 };
 
-typedef struct
+typedef struct mmap MMAP;
+
+struct mmap
 {
     UINT8 type;
     UINT8 flags;
-    UINT32 NoOfPage;
+    UINT64 NoOfPage;
     void *PhysicalAddress;
     void *VirtualAddress;
-} __attribute__((packed)) MMAP;
+    bool isLast;
+    MMAP *next;
+};
 
 typedef struct
 {
@@ -56,14 +66,6 @@ typedef struct
     TextMode text;
 } __attribute__((packed)) GraphicConfigure;
 
-#if X86_64
-
-typedef struct
-{
-} MProcess;
-
-#endif
-
 typedef struct
 {
     MMAP *mmap;
@@ -71,7 +73,6 @@ typedef struct
     GraphicConfigure gconfigre;
 #if X86_64
     UINT64 cpuExInfo;
-    MProcess mprocess;
 #endif
 } Table;
 

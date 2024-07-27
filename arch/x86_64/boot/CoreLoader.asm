@@ -10,6 +10,7 @@ section code vstart=CoreLoaderAddress
 
 	CoreDataAddressNextCanBeUsed dq CoreDataAddress
 
+	ARDs dq 0
 	ARD_count dd 0
 
 	is_e801 db 0
@@ -157,13 +158,14 @@ puts:
 bits 16
 start:
 	mov ebx, [CoreDataAddressNextCanBeUsed]
+	mov [ARDs], ebx
 	shr ebx, 4
 	mov es, bx
 	xor ebx, ebx
 	mov di, 0
 	.getARD:
 		mov ecx, 24
-		mov edx, "PAMa"
+		mov edx, "PAMS"
 		mov eax, 0xe820
 		int 0x15
 		jc .e801h
@@ -201,6 +203,17 @@ start:
 	.no_c:
 		add [memory_size + 4], edx
 	.memory_check_over:
+		xor edx, edx
+		mov eax, [ARD_count]
+		mov ecx, 24
+		mul ecx
+		add [CoreDataAddressNextCanBeUsed], eax
+		xor eax, eax
+		pushfd
+		pop ax
+		and ax, 1
+		add eax, edx
+		add [CoreDataAddressNextCanBeUsed + 4], eax
 
 	mov ebx, GdtAddress
 
@@ -799,6 +812,10 @@ load64:
 	mov dl, [is_e801]
 	mov rcx, [memory_size]
 	mov r8, [CPUDINFO2]
+	mov r9, [ARDs]
+	mov ebx, [ARD_count]
+	sub esp, 8
+	mov [esp], ebx
 	call gotoKernel
 	add rsp, 4
 	.end:
@@ -966,4 +983,4 @@ LoadElf:
 
 section trail
 	end:
-		dd load64
+		dd add_map_at, gotoKernel
