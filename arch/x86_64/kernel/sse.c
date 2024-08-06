@@ -1,5 +1,6 @@
 #include "x86-and-x86_64/sse.h"
 #include "shell.h"
+#include "video.h"
 
 void EnableSSE(UINT64 cpuExInfo)
 {

@@ -74,7 +74,7 @@ UINT64 add_map_at(MMAP *mmap, void *PhysicalAddress, void *VirtualAddress, UINT8
 	return used_count;
 }
 
-void gotoKernel(KERNEL_ENTER kernel, Table *table, bool isE801, UINT64 MemorySize, UINT64 cpuExInfo, ARD *ards, UINT32 ard_count)
+void gotoKernel(KERNEL_ENTER kernel, Table *table, bool isE801, UINT64 MemorySize, UINT64 cpuExInfo, ARD *ards, UINT32 ard_count, int LinearAddrSize, int PhyscialAddrSize)
 {
 	table->mmap = (MMAP *) ((void *)table + sizeof(Table));
 	if (isE801)
@@ -155,5 +155,7 @@ void gotoKernel(KERNEL_ENTER kernel, Table *table, bool isE801, UINT64 MemorySiz
 	table->gconfigre.text.height = 25;
 	table->gconfigre.text.width = 80;
 	table->gconfigre.text.screen = (Word *) 0xffff8000000b8000;
+	table->LinearAddrSize = LinearAddrSize;
+	table->PhysicalAddrSize = PhyscialAddrSize;
 	kernel(table);
 }

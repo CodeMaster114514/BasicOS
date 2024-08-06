@@ -29,4 +29,28 @@ static inline void io_out8(UINT16 port, UINT8 data)
 	);
 }
 
+static inline UINT32 io_in_cr3_32()
+{
+	UINT32 cr3;
+	asm(
+		"mov eax, cr3\n\t"
+		"mov %0, eax\n\t"
+		:"=m"(cr3)
+		:
+		:"eax"
+	);
+	return cr3;
+}
+
+static inline UINT32 io_out_cr3_32(UINT32 cr3)
+{
+	asm(
+		"mov eax, %0\n\t"
+		"mov cr3, eac\n\t"
+		:
+		:"m"(cr3)
+		:"eax"
+	);
+}
+
 #endif

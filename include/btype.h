@@ -41,7 +41,7 @@ struct mmap
     UINT8 type;
     UINT8 flags;
     UINT64 NoOfPage;
-    void *PhysicalAddress;
+    UINT64 PhysicalAddress;
     void *VirtualAddress;
     bool isLast;
     MMAP *next;
@@ -68,6 +68,8 @@ typedef struct
 
 typedef struct
 {
+    int LinearAddrSize;
+    int PhysicalAddrSize;
     MMAP *mmap;
     UINT64 map_count;
     GraphicConfigure gconfigre;

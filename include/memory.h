@@ -11,8 +11,20 @@ typedef unsigned long int size_t;
 #include "x86-and-x86_64/memory.h"
 
 #endif
+typedef struct
+{
+	MMAP *mmap;
+	UINT64 MmapCount;
+	MMAP *nextWrite;
+	bool isFull;
+	bool hasChanged;
+} MemoryConfigure;
 
-void InitMemory(MMAP *mmap, UINT64 count);
+void InitMemory(MMAP *mmap, UINT64 count, int LinearAddrSizd, int PhysicalAddrSize);
 void *alloc(size_t size);
+MMAP *FindAFreeMMAP();
+MMAP *FindThePreviousMMAPOf(MMAP *mmap);
+int HowManyCanPut();
+void *allocA4KBPage(UINT8 type, UINT8 flags);
 
 #endif

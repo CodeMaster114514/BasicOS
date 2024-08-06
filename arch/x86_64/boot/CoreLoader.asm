@@ -813,11 +813,17 @@ load64:
 	mov rcx, [memory_size]
 	mov r8, [CPUDINFO2]
 	mov r9, [ARDs]
+	mov ebx, [PhysicalAddressSize]
+	sub rsp, 8
+	mov [rsp], ebx
+	sub rsp, 8
+	mov ebx, [LinearAddressSize]
+	mov [rsp], ebx
+	sub rsp, 8
 	mov ebx, [ARD_count]
-	sub esp, 8
-	mov [esp], ebx
+	mov [rsp], ebx
 	call gotoKernel
-	add rsp, 4
+	add rsp, 24
 	.end:
 		hlt
 		jmp end
@@ -921,20 +927,31 @@ LoadSeg:
 		mov ecx, eax
 		.mapping:
 			push rcx
+			push rbx
+			push rsi
 			push rdi
 			mov rax, [rbx + rsi + 0x08]
 			add rax, [rbp - 8]
 			push rax
 			push qword [rbx + rsi + 0x10]
 			call MapPage
-			add rsp, 24
-			add rsi, [rbp - 16]
+			add rsp, 16
+			pop rdi
+			pop rsi
+			pop rbx
 			pop rcx
+			add qword [rbx + rsi + 0x10], 0x1000
+			add qword [rbx + rsi + 0x08], 0x1000
 			loop .mapping
 	.continue:
+		add rsi, [rbp - 16]
 		mov rcx, [rbp - 24]
-		loop .load
-
+		loop .toload
+		jmp .over
+	
+	.toload:
+		jmp .load
+.over:
 	add rsp, 32
 	pop rbp
 	ret
@@ -983,4 +1000,4 @@ LoadElf:
 
 section trail
 	end:
-		dd add_map_at, gotoKernel
+		dd load64

@@ -6,7 +6,7 @@ include configure.mk
 NASM_FLAGS = -I./arch/include/x86-and-x86_64 -I./Build
 OBJCOPY = objcopy
 GCC = gcc
-CC_FLAGS = -I$(PWD)/arch/include -I$(PWD)/include -I$(PWD)/drivers/include -I$(PWD) -masm=intel -c -fno-stack-protector -g
+CC_FLAGS = -I$(PWD)/arch/include -I$(PWD)/include -I$(PWD)/drivers/include -I$(PWD) -masm=intel -c -fno-stack-protector -g -Wno-builtin-declaration-mismatch
 LD_FLAGS = -Ttext 0xffff800000400000 -e kernel --no-pie -g
 OBJCOPY_FLAG = --only-keep-section .text --only-keep-section .data --only-keep-section .rodata
 target_files = Build/mbr.bin Build/CoreLoader.bin Build/kernel

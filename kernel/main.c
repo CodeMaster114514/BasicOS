@@ -19,7 +19,7 @@ int kernel(Table *table)
 	puts("CPU info %d.\n", table->cpuExInfo);
 	EnableSSE(table->cpuExInfo);
 #endif
-	InitMemory(table->mmap, table->map_count);
+	InitMemory(table->mmap, table->map_count, table->LinearAddrSize, table->PhysicalAddrSize);
 	puts("We are running in the ia32e mode\n");
 	puts("The number is %d\n", 512);
 	for(;;)
