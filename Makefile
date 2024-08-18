@@ -21,7 +21,7 @@ all:
 	make -C drivers -I$(PWD) OUT_DIR=$(PWD)/Build ROOT=$(PWD) CC_FLAGS="$(CC_FLAGS)"
 	$(LD) $(PWD)/Build/*.o $(LD_FLAGS) -o Build/kernel
 	dd if=./Build/mbr.bin of=a.img bs=512 conv=notrunc
-	dd if=./Build/CoreLoader.bin of=a.img bs=512 conv=notrunc seek=2048
+	dd if=./Build/CoreLoader.bin of=a.img bs=512 conv=notrunc seek=1
 
 Build/mbr.bin: arch/x86_64/boot/mbr.asm
 	nasm arch/x86_64/boot/mbr.asm -o Build/mbr.bin $(NASM_FLAGS)

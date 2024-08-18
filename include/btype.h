@@ -73,9 +73,6 @@ typedef struct
     MMAP *mmap;
     UINT64 map_count;
     GraphicConfigure gconfigre;
-#if X86_64
-    UINT64 cpuExInfo;
-#endif
 } Table;
 
 #endif

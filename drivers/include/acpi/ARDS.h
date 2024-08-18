@@ -3,7 +3,7 @@
 
 #include "btype.h"
 
-enum ARDT
+enum ARDT // Address Range Descriptor Type
 {
 	Memory = 1,
 	Reserved = 2,
@@ -41,7 +41,7 @@ typedef struct
 	};
 	UINT32 type;
 	UINT32 EA; // Extended Attributes
-} __attribute__((packed)) ARD;
+} __attribute__((packed)) ARD;// Address Range Descriptor
 
 typedef struct
 {

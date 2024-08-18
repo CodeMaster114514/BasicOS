@@ -2,35 +2,43 @@
 #include "shell.h"
 #include "video.h"
 
-void EnableSSE(UINT64 cpuExInfo)
+UINT32 DataOfECX, DataOfEDX;
+
+void EnableSSE() // 启用拓展
 {
-	if (cpuExInfo & (SSE | SSE2))
+	UINT32 result = 0;
+	asm( // 启用XCR0的读写
+		"mov rax, cr4\n\t"
+		"or eax, 0x40200\n\t"
+		"mov cr4, rax\n\t"
+		:
+		:
+		:"eax"
+	);
+	asm(
+		"mov eax, 0\n\t"
+		"cpuid\n\t"
+		"mov %0, ecx\n\t"
+		"mov %1, edx\n\t"
+		:"=m"(DataOfECX), "=m"(DataOfEDX)
+		:
+		:"eax", "ecx", "edx"
+	);
+	if (DataOfEDX & CPUID_FEAT_EDX_SSE)
 	{
-		asm(
-			"mov rax, cr0\n\t"
-			"and ax, 0xfffb\n\t"
-			"or ax, 2\n\t"
-			"mov cr0, rax\n\t"
-			"mov rax, cr4\n\t"
-			"or eax, 0x40600\n\t"
-			"mov cr4, rax\n\t"
-			"xor ecx, ecx\n\t"
-			"xgetbv\n\t"
-			"or eax, 3\n\t"
-			"xsetbv\n\t"
-			:
-			:
-			:"eax", "ecx", "edx"
-		);
+		result |= 0b10;
 	}
-	else
+	if (DataOfECX & CPUID_FEAT_ECX_AVX)
 	{
-		for (;;)
-		{
-			putc('x', 0xffff);
-			asm(
-				"hlt"
-			);
-		}
+		result |= 0b100;
 	}
+	asm(
+		"xor ecx, ecx\n\t"
+		"xgetbv\n\t"
+		"or eax, %0\n\t"
+		"xsetbv\n\t"
+		:
+		:"m"(result)
+		:"eax", "ecx"
+	);
 }

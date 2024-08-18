@@ -56,6 +56,7 @@ void *allocA4KBPage(UINT8 type, UINT8 flags)
 	mmap->PhysicalAddress += 0x1000;
 	mmap->NoOfPage -= 1;
 	void *target = MapAPageInFreeVirtualAddress(PhysicalAddress, PageSize4KB, PageFlags);
+	puts('%p\n', target);
 	*configure.nextWrite = MmapCache;
 	configure.nextWrite->next = mmap;
 	FindThePreviousMMAPOf(mmap)->next = configure.nextWrite;

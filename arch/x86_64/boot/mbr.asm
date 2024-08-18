@@ -4,9 +4,10 @@
 
 jc .read_error
 
-cmp word [CoreLoaderAddress], "Hu"
+cmp word [CoreLoaderAddress], "Hu"; 验证CoreLoader是否为系统提供的
 jnz .stop
 
+;计算还要读多少扇区
 mov ebx, CoreLoaderAddress
 mov eax, [ebx + 2]
 xor edx, edx
@@ -19,6 +20,7 @@ dec eax
 	or eax, eax
 	jz .go_loader
 
+; 更改global.asm中传给0x18中断的表
 inc dword [si + 8]
 add word [si + 4], 512
 mov [si + 2], ax

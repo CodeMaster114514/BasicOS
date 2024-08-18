@@ -4,6 +4,6 @@
 #include "cpuid.h"
 #include "btype.h"
 
-void EnableSSE(UINT64 cpuExInfo);
+void EnableSSE();
 
 #endif

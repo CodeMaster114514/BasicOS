@@ -10,6 +10,8 @@
 
 %ifdef mbr
 
+; 这段代码可以作为32位系统和64位系统的mbr
+
 org 0x7c00
 
 mov ax, cs
@@ -18,10 +20,8 @@ mov es, ax
 mov ss, ax
 mov sp, 0x7c00
 
-mov eax, [0x7c00 + 446 + 8]
-
 push dword 0
-push dword eax
+push dword 1
 mov ax, cs
 push ax
 push word CoreLoaderAddress

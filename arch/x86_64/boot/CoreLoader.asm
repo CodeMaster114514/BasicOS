@@ -20,9 +20,6 @@ section code vstart=CoreLoaderAddress
 	NumberStringCache1 times 11 db 0x00
 	NumberStringCache2 times 11 db 0x00
 
-	CPUDINFO2 dd 0; 底字节为edx
-	CPUDINFO1 dd 0
-
 	PhysicalAddressSize dd 0
 	LinearAddressSize dd 0
 
@@ -39,6 +36,8 @@ section code vstart=CoreLoaderAddress
 			 db 0x00
 
 bits 32
+
+;传入数字返回数字字符串
 NumberToString:
 	push ebp
 	mov ebp, esp
@@ -72,12 +71,13 @@ NumberToString:
 	lea eax, [NumberStringCache2]
 	ret
 
+; 打印字符出字符串
 puts:
 	push ebp
 	mov ebp, esp
 	sub esp, 4
 
-	mov dword [ebp - 4], 12
+	mov dword [ebp - 4], 12; 访问额外参数用的偏移
 
 	mov ebx, [ebp + 8] ;获得字符串指针
 	mov eax, 0 ;字符偏移
@@ -157,13 +157,14 @@ puts:
 
 bits 16
 start:
+	;准备读取Address Range Descriptor
 	mov ebx, [CoreDataAddressNextCanBeUsed]
 	mov [ARDs], ebx
 	shr ebx, 4
 	mov es, bx
 	xor ebx, ebx
 	mov di, 0
-	.getARD:
+	.getARD:;读取
 		mov ecx, 24
 		mov edx, "PAMS"
 		mov eax, 0xe820
@@ -176,7 +177,7 @@ start:
 		inc dword [ARD_count]
 		jmp .getARD
 
-	.e801h:
+	.e801h: ;无法读取，只获取内存大小
 		mov byte [is_e801], -1
 		
 		xor ecx, ecx
@@ -215,10 +216,11 @@ start:
 		add eax, edx
 		add [CoreDataAddressNextCanBeUsed + 4], eax
 
+	;准备进入32位模式
 	mov ebx, GdtAddress
 
 	mov dword [ebx + 0x00], 0
-	mov dword [ebx + 0x04], 0
+	mov dword [ebx + 0x04], 0 ;空描述符
 
 	mov dword [ebx + 0x08], 0x0000ffff
 	mov dword [ebx + 0x0c], 0x00cf9800 ;代码段描述符
@@ -229,38 +231,48 @@ start:
 	mov dword [ebx + 0x18], 0
 	mov dword [ebx + 0x1c], 0x00209800 ;64位代码段
 
+	;设置GDTR
 	mov [GDTR_in], ebx
 	mov word [GDTR_L], 31
 	lgdt [GDTR_L]
 
+	; 打开A20
 	in al, 0x92
 	or ax, 0x2
 	out 0x92, al
 
+	; 屏蔽NMI
 	in al, 0x70
 	or al, 0x80
 	out 0x70, ax
+	in al, 0x71
 
+	; 关闭所有中断
 	cli
+
+	; 进入32位模式
 	mov eax, cr0
 	or eax, 1
 	mov cr0, eax
 
-	jmp 0x0008:load32
+	jmp 0x0008:load32; 清空流水线，串化处理器
 
 load32:
 	bits 32
 
+	; 设置栈、数据段
 	mov eax, 0x00010
 	mov ds, ax
 	mov ss, ax
 	mov esp, 0x7c00
 
+	; 输出字符，告诉用户已经进入32位模式
 	sub esp, 4
 	mov dword [esp], Enter32ModeMessage
 	call puts
 	add esp, 4
 
+	; 判断是否支持64位模式
 	mov eax, 0x80000000
 	cpuid
 	cmp eax, 0x80000008
@@ -273,6 +285,7 @@ load32:
 
 	mov edi, [CoreDataAddressNextCanBeUsed]
 
+	; 获取处理器厂商信息并打印
 	mov eax, 0x80000002
 	cpuid
 	mov [edi + 0x00], eax
@@ -298,11 +311,6 @@ load32:
 	call puts
 	add esp, 4
 
-	mov eax, 1
-	cpuid
-	mov [CPUDINFO1], ebx
-	mov [CPUDINFO2], edx
-
 	dec esp
 	mov byte [esp], 0x0a
 	call putc
@@ -321,6 +329,7 @@ load32:
 	call puts
 	add esp, 12
 
+	;读取内核文件
 	call LoadCoreFile
 
 	; 准备进入ia-32e模式
@@ -356,6 +365,7 @@ load32:
 	mov dword [ebx + 1 * 8], CoreCache | 0x83
 	push eax
 
+	; 挂载页表
 	mov eax, PML4PhysicalAddress
 	mov cr3, eax
 
@@ -363,12 +373,14 @@ load32:
 	bts eax, 5
 	mov cr4, eax
 
+	; 设置IA32_EFER
 	mov ecx, 0x0c0000080
 	rdmsr
 
 	bts eax, 8
 	wrmsr
 
+	; 开启分页，正式进入64位模式
 	mov eax, cr0
 	or eax, 0x80000000
 	mov cr0, eax
@@ -438,7 +450,6 @@ ReadASector:
 	push ebp
 	mov ebp, esp
 
-.retry:
 	mov dx, 0x1f2
 	mov al, 1
 	out dx, al
@@ -557,6 +568,7 @@ OpenFile:
 		add esp, 12
 		mov dword [ebp - 24], FileSystemCache + 0x200
 
+		; 计算FAT的根目录出
 		mov dword [ebp - 28], FileSystemCache + 0x200
 		mov ebx, FileSystemCache
 		mov ax, [ebx + 0x16]
@@ -811,11 +823,8 @@ load64:
 	mov [rbx + 0x00], rax
 	mov dl, [is_e801]
 	mov rcx, [memory_size]
-	mov r8, [CPUDINFO2]
-	mov r9, [ARDs]
-	mov ebx, [PhysicalAddressSize]
-	sub rsp, 8
-	mov [rsp], ebx
+	mov r8, [ARDs]
+	mov r9, [PhysicalAddressSize]
 	sub rsp, 8
 	mov ebx, [LinearAddressSize]
 	mov [rsp], ebx
@@ -1000,4 +1009,4 @@ LoadElf:
 
 section trail
 	end:
-		dd load64
+		dd LoadSeg.mapping

@@ -53,4 +53,52 @@ static inline UINT32 io_out_cr3_32(UINT32 cr3)
 	);
 }
 
+static inline UINT32 getFlags32()
+{
+	UINT32 flags;
+	asm(
+		"pushfd\n\t"
+		"pop eax\n\t"
+		"mov %0, eax\n\t"
+		:"=m"(flags)
+		:
+		:"eax"
+	);
+	return flags;
+}
+
+static inline void setFlags32(UINT32 flags)
+{
+	asm(
+		"mov eax, %0\n\t"
+		"push eax\n\t"
+		"popfd\n\t"
+		:
+		:"m"(flags)
+		:"eax"
+	);
+}
+
+static inline UINT16 getCS()
+{
+	UINT16 cs;
+	asm(
+		"mov ax, cs\n\t"
+		"mov %0, ax\n\t"
+		:"=m"(cs)
+		:
+		:"ax"
+	);
+}
+
+static inline void openInterrupt()
+{
+	asm("sti\n\t");
+}
+
+static inline void closeInterrupt()
+{
+	asm("cli\n\t");
+}
+
 #endif

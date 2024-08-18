@@ -11,9 +11,9 @@ UINT64 add_map_at(MMAP *mmap, void *PhysicalAddress, void *VirtualAddress, UINT8
 	bool isLast = false;
 	while (1) {
 		isLast = mmap->isLast;
-		if (mmap->PhysicalAddress <= PhysicalAddress && mmap->PhysicalAddress + (mmap->NoOfPage << 12) > PhysicalAddress)
+		if (mmap->PhysicalAddress <= (UINT64)PhysicalAddress && mmap->PhysicalAddress + (mmap->NoOfPage << 12) > (UINT64)PhysicalAddress)
 		{
-			if (PhysicalAddress == mmap->PhysicalAddress)
+			if ((UINT64)PhysicalAddress == mmap->PhysicalAddress)
 			{
 				*next = *mmap;
 				next->NoOfPage -= NoOfPage;
@@ -40,7 +40,7 @@ UINT64 add_map_at(MMAP *mmap, void *PhysicalAddress, void *VirtualAddress, UINT8
 					.flags = flags,
 					.NoOfPage = NoOfPage,
 					.isLast = false,
-					.PhysicalAddress = PhysicalAddress,
+					.PhysicalAddress = (UINT64)PhysicalAddress,
 					.VirtualAddress = VirtualAddress,
 					.next = NeedThirdMap ? 0 : (mmap->next ? mmap->next : &mmap[1])
 				};
@@ -74,7 +74,7 @@ UINT64 add_map_at(MMAP *mmap, void *PhysicalAddress, void *VirtualAddress, UINT8
 	return used_count;
 }
 
-void gotoKernel(KERNEL_ENTER kernel, Table *table, bool isE801, UINT64 MemorySize, UINT64 cpuExInfo, ARD *ards, UINT32 ard_count, int LinearAddrSize, int PhyscialAddrSize)
+void gotoKernel(KERNEL_ENTER kernel, Table *table, bool isE801, UINT64 MemorySize, ARD *ards, UINT32 ard_count, int LinearAddrSize, int PhyscialAddrSize)
 {
 	table->mmap = (MMAP *) ((void *)table + sizeof(Table));
 	if (isE801)
@@ -88,19 +88,19 @@ void gotoKernel(KERNEL_ENTER kernel, Table *table, bool isE801, UINT64 MemorySiz
 		table->mmap[1] = (MMAP){
 			.type = MAP_TYPE_UNKNOW,
 			.NoOfPage = 1,
-			.PhysicalAddress = (void *) 0x9f000
+			.PhysicalAddress = 0x9f000
 		};
 		table->mmap[2] = (MMAP){
 			.type = MAP_TYPE_UNKNOW,
 			.NoOfPage =  0x10000 / 0x1000,
-			.PhysicalAddress = (void *) 0xf0000,
+			.PhysicalAddress = 0xf0000,
 			.isLast = !isHigher
 		};
 		if (isHigher)
 			table->mmap[3] = (MMAP){
 				.type = MAP_TYPE_FREE_MEMORY,
 				.NoOfPage = (MemorySize - 0x9fc00) / 0x1000,
-				.PhysicalAddress = (void *) 0x100000,
+				.PhysicalAddress = 0x100000,
 				.isLast = true
 			};
 		table->map_count = 4 + isHigher ? 1 : 0;
@@ -115,14 +115,14 @@ void gotoKernel(KERNEL_ENTER kernel, Table *table, bool isE801, UINT64 MemorySiz
 					table->mmap[i] = (MMAP){
 						.type = MAP_TYPE_FREE_MEMORY,
 						.NoOfPage = ards[i].Length / 0x1000,
-						.PhysicalAddress = (void *) (ards[i].BaseAddr & 0xfffffffffffff000)
+						.PhysicalAddress = (ards[i].BaseAddr & 0xfffffffffffff000)
 					};
 					break;
 				case ACPIMemory:
 					table->mmap[i] = (MMAP){
 						.type = MAP_TYPE_ACPI,
 						.NoOfPage = ards[i].Length / 0x1000 + ards[i].Length % 0x1000 ? 1 : 0,
-						.PhysicalAddress = (void *) (ards[i].BaseAddr & 0xfffffffffffff000)
+						.PhysicalAddress = (ards[i].BaseAddr & 0xfffffffffffff000)
 					};
 					break;
 				case Reserved:
@@ -130,7 +130,7 @@ void gotoKernel(KERNEL_ENTER kernel, Table *table, bool isE801, UINT64 MemorySiz
 					table->mmap[i] = (MMAP){
 						.type = MAP_TYPE_UNKNOW,
 						.NoOfPage = ards[i].Length / 0x1000 + ards->Length % 0x1000 ? 1 : 0,
-						.PhysicalAddress = (void *) (ards[i].BaseAddr & 0xfffffffffffff000)
+						.PhysicalAddress = (ards[i].BaseAddr & 0xfffffffffffff000)
 					};
 			}
 		}
@@ -150,7 +150,6 @@ void gotoKernel(KERNEL_ENTER kernel, Table *table, bool isE801, UINT64 MemorySiz
 			next_map_at = &table->mmap[table->map_count];
 		}
 	}
-	table->cpuExInfo = cpuExInfo;
 	table->gconfigre.status = false;
 	table->gconfigre.text.height = 25;
 	table->gconfigre.text.width = 80;
