@@ -1,7 +1,8 @@
+#include "kernel.h"
 #include "btype.h"
 #include "memory.h"
 #include "video.h"
-#include <stdarg.h>
+#include "arg.h"
 
 char *cache = 0;
 
@@ -42,7 +43,7 @@ const char *PointerToString(void *addr)
 	int string_index = 0;
 	while (addr_num != 0)
 	{
-		int remainer = addr_num % 0xf;
+		int remainer = addr_num % 0x10;
 		if (remainer < 10)
 		{
 			NumberString0[string_index] = remainer + 0x30;
@@ -51,7 +52,7 @@ const char *PointerToString(void *addr)
 		{
 			NumberString0[string_index] = remainer - 10 + 'a';
 		}
-		addr_num /= 0xf;
+		addr_num = addr_num >> 4;
 		string_index++;
 	}
 	--string_index;
@@ -81,21 +82,25 @@ int puts(const char *str, ...)
 			switch (str[count + 1])
 			{
 			case 'd':
-				puts(NumToString(va_arg(list, int)));
+				str_len += puts(NumToString(va_arg(list, int)));
 				count += 2;
-				str_len += 2;
 				break;
 			
 			case 's':
-				puts(va_arg(list, const char *));
+				str_len += puts(va_arg(list, const char *));
 				count += 2;
-				str_len += 2;
 				break;
 			
 			case 'p':
-				puts(PointerToString(va_arg(list, void *)));
+				str_len += puts(PointerToString(va_arg(list, void *)));
 				count += 2;
-				str_len += 2;
+				break;
+			
+			case 'c':
+				putc(va_arg(list, int), 0xffff);
+				count += 2;
+				str_len++;
+				break;
 			
 			default:
 				goto normal;
@@ -110,5 +115,5 @@ int puts(const char *str, ...)
 			str_len++;
 		}
 	}
-	
+	return str_len;
 }

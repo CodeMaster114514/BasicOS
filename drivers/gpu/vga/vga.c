@@ -1,5 +1,6 @@
 #include "gpu/vga.h"
-#include "x86-and-x86_64/io/io64.h"
+#include "btype.h"
+#include "x86/io/io32.h"
 
 UINT16 getCursor()
 {

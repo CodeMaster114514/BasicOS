@@ -5,5 +5,6 @@
 // text mode
 UINT16 getCursor();
 void setCursor(UINT16 Cursor);
+void clearScreen();
 
 #endif

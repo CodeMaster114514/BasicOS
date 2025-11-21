@@ -17,4 +17,7 @@ $(OUT_DIR)/shell.o: shell.c
 	$(CC) $(CC_FLAGS) shell.c -o $(OUT_DIR)/shell.o
 
 $(OUT_DIR)/video.o: video.c
-	$(CC) $(CC_FLAGS) video.c -o $(OUT_DIR)/video.o
+	$(CC) $(CC_FLAGS) -mcmodel=large video.c -o $(OUT_DIR)/video.o
+
+clean:
+	rm -rf $(OBJECTS)

@@ -1,3 +1,4 @@
+#include "kernel.h"
 #include "video.h"
 
 TextMode *text;
@@ -16,7 +17,17 @@ void copyWord(UINT16 target, UINT16 source, UINT16 count)
 {
 	for (UINT16 i = 0; i < count; ++i)
 	{
-		text->screen[target] = text->screen[source];
+		text->screen[target + i] = text->screen[source];
+		source++;
+	}
+}
+
+void clearWord(UINT16 start, UINT16 count)
+{
+	for (UINT16 i = 0; i < count; ++i)
+	{
+		text->screen[start + i].word = ' ';
+		text->screen[start + i].color = 0x07; // 默认白色
 	}
 }
 
@@ -43,6 +54,7 @@ roll:
 	if (cursor >= 2000)
 	{
 		copyWord(0, 80, 1920);
+		clearWord(1920, 80);
 		cursor = 1920;
 	}
 set:

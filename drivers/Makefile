@@ -11,4 +11,7 @@ endif
 all: $(DRIVERS)
 
 vga:
-	make -C gpu -I$(ROOT) OUT_DIR=$(OUT_DIR) ROOT=$(ROOT) vga
+	make -C gpu -I$(ROOT) OUT_DIR=$(OUT_DIR) ROOT=$(ROOT) vga -e
+
+clean:
+	make -C gpu -I$(ROOT) OUT_DIR=$(OUT_DIR) ROOT=$(ROOT) vga -e clean

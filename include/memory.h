@@ -5,26 +5,29 @@
 #include "btype.h"
 
 typedef unsigned long int size_t;
+#define NULL 0
 
 #if X86_64
 
-#include "x86-and-x86_64/memory.h"
+#include "x86/memory.h"
 
 #endif
 typedef struct
 {
 	MMAP *mmap;
 	UINT64 MmapCount;
+	MMAP *nextWriteStart;
 	MMAP *nextWrite;
 	bool isFull;
-	bool hasChanged;
+	bool debug;
 } MemoryConfigure;
 
 void InitMemory(MMAP *mmap, UINT64 count, int LinearAddrSizd, int PhysicalAddrSize);
 void *alloc(size_t size);
-MMAP *FindAFreeMMAP();
-MMAP *FindThePreviousMMAPOf(MMAP *mmap);
-int HowManyCanPut();
+void addMMAPAfter(MMAP *mmap, MMAP *target);
+void addMMAPBefore(MMAP *mmap, MMAP *target);
 void *allocA4KBPage(UINT8 type, UINT8 flags);
+void *allocA2MBPage(UINT8 type, UINT8 flags);
+void cleanMemory(void *target_address, UINT64 size);
 
 #endif

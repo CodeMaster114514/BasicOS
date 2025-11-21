@@ -1,2 +1,2 @@
-ARCH = x86_64
+ARCH = x86
 GPU_VGA = 1

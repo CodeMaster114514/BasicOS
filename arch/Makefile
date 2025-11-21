@@ -1,8 +1,10 @@
 include configure.mk
 
-ifeq ($(ARCH), x86_64)
+ifeq ($(ARCH), x86)
 
 all:
-	make -C x86_64 -I$(ROOT) OUT_DIR=$(OUT_DIR) ROOT=$(ROOT)
+	make -C x86 -I$(ROOT) OUT_DIR=$(OUT_DIR) ROOT=$(ROOT) -e
 
+clean:
+	make -C x86 -I$(ROOT) OUT_DIR=$(OUT_DIR) ROOT=$(ROOT) clean -e
 endif
